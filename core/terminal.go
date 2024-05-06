@@ -56,12 +56,22 @@ func NewTerminal(p *HttpProxy, cfg *Config, crt_db *CertDb, db *database.Databas
 	t.createHelp()
 	t.completer = t.hlp.GetPrefixCompleter(LAYER_TOP)
 
+	// Get the home directory of the current user
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the path for the history file within the home directory
+	historyFilePath := filepath.Join(homeDir, ".evilginx/.term_hist")
+
 	t.rl, err = readline.NewEx(&readline.Config{
 		Prompt:              DEFAULT_PROMPT,
 		AutoComplete:        t.completer,
 		InterruptPrompt:     "^C",
 		EOFPrompt:           "exit",
 		FuncFilterInputRune: t.filterInput,
+		HistoryFile:         historyFilePath,
 	})
 	if err != nil {
 		return nil, err
@@ -106,6 +116,8 @@ func (t *Terminal) DoWork() {
 			log.Error("syntax error: %v", err)
 		}
 
+		t.rl.SaveHistory(line) // Save line to history file
+
 		argn := len(args)
 		if argn == 0 {
 			t.checkStatus()
@@ -122,6 +134,12 @@ func (t *Terminal) DoWork() {
 			err := t.handleConfig(args[1:])
 			if err != nil {
 				log.Error("config: %v", err)
+			}
+		case "pushover":
+			cmd_ok = true
+			err := t.handlePushover(args[1:])
+			if err != nil {
+					log.Error("pushover: %v", err)
 			}
 		case "proxy":
 			cmd_ok = true
@@ -698,6 +716,36 @@ func (t *Terminal) handlePhishlets(args []string) error {
 	return fmt.Errorf("invalid syntax: %s", args)
 }
 
+func (t *Terminal) handlePushover(args []string) error {
+	if len(args) == 0 {
+		// Display current Pushover settings
+		keys := []string{"enabled", "appkey", "userkey"}
+		var enabledStr string = "no"
+		if t.cfg.IsPushoverEnabled() {
+			enabledStr = "yes"
+		}
+		vals := []string{enabledStr, t.cfg.GetPushoverAppKey(), t.cfg.GetPushoverUserKey()}
+		log.Printf("\n%s\n", AsRows(keys, vals))
+		return nil
+	} else if len(args) == 2 {
+		switch args[0] {
+		case "appkey":
+			t.cfg.SetPushoverAppKey(args[1])
+			return nil
+		case "userkey":
+			t.cfg.SetPushoverUserKey(args[1])
+			return nil
+		case "enable":
+			t.cfg.SetPushoverEnabled(true)
+			return nil
+		case "disable":
+			t.cfg.SetPushoverEnabled(false)
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid syntax: %s", args)
+}
+
 func (t *Terminal) handleLures(args []string) error {
 	hiblue := color.New(color.FgHiBlue)
 	yellow := color.New(color.FgYellow)
@@ -1173,6 +1221,14 @@ func (t *Terminal) createHelp() {
 	h.AddSubCommand("config", []string{"gophish", "api_key"}, "gophish api_key <key>", "set up the api key for the gophish instance to communicate with")
 	h.AddSubCommand("config", []string{"gophish", "insecure"}, "gophish insecure <true|false>", "enable or disable the verification of gophish tls certificate (set to `true` if using self-signed certificate)")
 	h.AddSubCommand("config", []string{"gophish", "test"}, "gophish test", "test the gophish configuration")
+
+	h.AddCommand("pushover", "general", "manage Pushover notifications", "Configures Pushover settings for push notifications.", LAYER_TOP,
+	readline.PcItem("pushover", readline.PcItem("enable"), readline.PcItem("disable"), readline.PcItem("appkey"), readline.PcItem("userkey")))
+	h.AddSubCommand("pushover", nil, "", "show current Pushover settings")
+	h.AddSubCommand("pushover", []string{"enable"}, "enable", "enable Pushover notifications")
+	h.AddSubCommand("pushover", []string{"disable"}, "disable", "disable Pushover notifications")
+	h.AddSubCommand("pushover", []string{"appkey"}, "appkey <app_key", "set the Pushover app key")
+	h.AddSubCommand("pushover", []string{"userkey"}, "userkey <user_key", "set the Pushover user key")
 
 	h.AddCommand("proxy", "general", "manage proxy configuration", "Configures proxy which will be used to proxy the connection to remote website", LAYER_TOP,
 		readline.PcItem("proxy", readline.PcItem("enable"), readline.PcItem("disable"), readline.PcItem("type"), readline.PcItem("address"), readline.PcItem("port"), readline.PcItem("username"), readline.PcItem("password")))
